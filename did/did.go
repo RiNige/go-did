@@ -1,10 +1,14 @@
 package did
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"log"
 
+	"github.com/RiNige/go-did/contracts"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -31,7 +35,11 @@ func NewClient(portNumber string) *ethclient.Client {
 	if err != nil {
 		panic(err)
 	}
-
+	blockNum, err := client.BlockNumber(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Connected to local Ethereum network at: %s, the current Block Number is %v\n", portNumber, blockNum)
 	return client
 }
 
@@ -64,6 +72,60 @@ func HandleCreateDID() (*DIDCreationResponse, error) {
 	return &DIDCreationResponse{
 		DID:        did,
 		PrivateKey: fmt.Sprintf("%x", crypto.FromECDSA(privateKey)),
+		Address:    address,
 		Document:   doc,
 	}, nil
+}
+
+func DeployContract(client *ethclient.Client, privateKey string) common.Address {
+	// Create auth and deploy contract
+	auth := getAccountAuth(client, privateKey)
+	contractAddress, tx, _, err := contracts.DeployContracts(auth, client)
+	if err != nil {
+		log.Fatal(err)
+	}
+	receipt, err := bind.WaitMined(context.Background(), client, tx)
+	if err != nil {
+		panic(err)
+	}
+	if receipt.Status == 0 {
+		log.Fatal("Failed to deploy the smart contract")
+	}
+	fmt.Println("Successfully deployed smart contract to the blockchain!")
+	return contractAddress
+}
+
+func getAccountAuth(client *ethclient.Client, privatekey string) *bind.TransactOpts {
+	privateKey, err := crypto.HexToECDSA(privatekey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		panic("invalid key")
+	}
+
+	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+
+	//fetch the last use nonce of account
+	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("nounce=", nonce)
+
+	chainID, err := client.ChainID(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+	if err != nil {
+		panic(err)
+	}
+	auth.GasLimit = uint64(2000000)
+
+	return auth
 }

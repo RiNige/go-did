@@ -22,7 +22,9 @@ type DIDDocument struct {
 
 // Proposed Response for DID Creation
 type DIDCreationResponse struct {
-	DID        string       `json:"did"`
-	PrivateKey string       `json:"private_key,omitempty"`
-	Document   *DIDDocument `json:"document"`
+	DID          string       `json:"did"`
+	PrivateKey   string       `json:"private_key,omitempty"`
+	Address      string       `json:"address"`
+	StoreOnChain bool         `json:"storeonchain"`
+	Document     *DIDDocument `json:"document"`
 }
