@@ -2,34 +2,48 @@ package main
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 
+	"github.com/RiNige/go-did/contracts"
 	"github.com/RiNige/go-did/db"
 	"github.com/RiNige/go-did/did"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
+)
+
+// Some global parameters
+var (
+	dbClient       *sql.DB
+	ethClient      *ethclient.Client
+	contractClient *contracts.Contracts
 )
 
 func main() {
 	// Initiate and test out PostgresSQL connection
 	// NOTE: HERE WE ASSUMES THE LOCAL HOST ALREADY SETUP WITH AWS CREDENTIALS
 	//ctx := context.Background()
-	dbclient := db.ConnectDB()
-	defer dbclient.Close()
+	dbClient := db.ConnectDB()
+	defer dbClient.Close()
 
 	// Initiate local Etherum connection
-	eth := did.NewClient("7545")
-	defer eth.Close()
+	ethClient := did.NewClient("7545")
+	defer ethClient.Close()
 
 	// Deploy smart contract to local blockchain
-	contractAddress := did.DeployContract(eth, "27607949c7345cf1142c809afded87af7c63cc78c15061112373c8dc69952ce7")
-	fmt.Println(contractAddress)
+	contractAddress := did.DeployContract(ethClient, "27607949c7345cf1142c809afded87af7c63cc78c15061112373c8dc69952ce7")
+	contractClient, err := contracts.NewContracts(contractAddress, ethClient)
+	if err != nil {
+		log.Fatalf("Failed to create the smart contract instance:%v", err)
+	}
 
 	// Initiate Gin Server
 	r := gin.Default()
 	r.POST("/dids", func(c *gin.Context) {
+
 		// Generate DID
 		resp, err := did.HandleCreateDID()
 		if err != nil {
@@ -49,25 +63,36 @@ func main() {
 
 		hash := sha256.Sum256(respByte)
 		hashHex := hex.EncodeToString(hash[:])
-		fmt.Println(hashHex)
 
 		// Save DID Document to Postgres on AWS
-		err = dbclient.SaveDID(db.DIDRecord{
+		err = dbClient.SaveDID(db.DIDRecord{
 			DID:      resp.DID,
 			Document: string(respByte),
 			Hash:     hashHex,
 			Owner:    resp.Address,
 		})
-
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save DID Document to Postgres"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":       "Failed to save DID Document to Postgres",
+				"Description": err.Error()})
 			return
 		}
+
+		// Store the DID Document Hash onto Blockchain
+		tx, err := did.StoreHashOnChain(resp.DID, hashHex, resp.PrivateKey, ethClient, contractClient)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":       "Failed to save DID Document to Blockchain",
+				"Description": err.Error()})
+			return
+		}
+
 		// Return the Result
 		c.JSON(http.StatusOK, gin.H{
-			"DID":           resp.DID,
-			"StoreOn Chain": resp.StoreOnChain,
-			"DBHash":        hashHex,
+			"DID":       resp.DID,
+			"ChainHash": tx,
+			"DBHash":    hashHex,
 		})
 	})
 	r.Run(":8080")

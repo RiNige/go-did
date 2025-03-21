@@ -29,6 +29,41 @@ func newPrivateKey() (*ecdsa.PrivateKey, string, error) {
 	return privateKey, address, nil
 }
 
+func getAccountAuth(client *ethclient.Client, privatekey string) *bind.TransactOpts {
+	privateKey, err := crypto.HexToECDSA(privatekey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		panic("invalid key")
+	}
+
+	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+
+	//fetch the last use nonce of account
+	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("nounce=", nonce)
+
+	chainID, err := client.ChainID(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+	if err != nil {
+		panic(err)
+	}
+	auth.GasLimit = uint64(2000000)
+
+	return auth
+}
+
 func NewClient(portNumber string) *ethclient.Client {
 	// Connect to the blockchain running at localhost
 	client, err := ethclient.Dial("http://localhost:" + portNumber)
@@ -95,37 +130,26 @@ func DeployContract(client *ethclient.Client, privateKey string) common.Address 
 	return contractAddress
 }
 
-func getAccountAuth(client *ethclient.Client, privatekey string) *bind.TransactOpts {
-	privateKey, err := crypto.HexToECDSA(privatekey)
+func StoreHashOnChain(did string, hash string, owner string, eth *ethclient.Client, contract *contracts.Contracts) (string, error) {
+	// Create auth for this connection
+	auth := getAccountAuth(eth, owner)
+	auth.GasLimit = 500000
+	auth.Context = context.Background()
+
+	// Send the transaction
+	tx, err := contract.SetHash(auth, did, hash)
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("failed to set the Hash: %v", err)
 	}
 
-	publicKey := privateKey.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		panic("invalid key")
-	}
+	// Wait until the finish of transaction asyncronously
+	go func(txHash string, eth *ethclient.Client) {
+		// Monitor the transaction status
+		receipt, _ := eth.TransactionReceipt(context.Background(), common.HexToHash(txHash))
+		if receipt.Status == 0 {
+			log.Printf("Transaction %s Failed", txHash)
+		}
+	}(tx.Hash().Hex(), eth)
 
-	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-
-	//fetch the last use nonce of account
-	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("nounce=", nonce)
-
-	chainID, err := client.ChainID(context.Background())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
-	if err != nil {
-		panic(err)
-	}
-	auth.GasLimit = uint64(2000000)
-
-	return auth
+	return tx.Hash().Hex(), nil
 }
