@@ -17,7 +17,7 @@ import (
 
 // Some global parameters
 const (
-	systemAccount = "5a2701eb7e039fe0077aa3281a00a2e1f869303e94617eb2085ae0c82575288d"
+	systemAccount = "27607949c7345cf1142c809afded87af7c63cc78c15061112373c8dc69952ce7"
 )
 
 var (
@@ -34,7 +34,7 @@ func main() {
 	defer dbClient.Close()
 
 	// Initiate local Etherum connection
-	ethClient := did.NewClient("7545")
+	ethClient := did.NewClient("8545")
 	defer ethClient.Close()
 
 	// Deploy smart contract to local blockchain
@@ -106,6 +106,7 @@ func main() {
 		})
 	})
 
+	// Single query of DID
 	r.GET("/dids/:did", func(c *gin.Context) {
 		did_target := c.Param("did")
 
@@ -132,6 +133,31 @@ func main() {
 			"Hash on DB":         record.Hash,
 			"Hash on Blockchain": resp_did,
 			"Created At":         record.CreatedAt,
+		})
+	})
+
+	// Batch query of DIDs
+	r.GET("/dids", func(c *gin.Context) {
+		did_targets := c.QueryArray("did")
+		if len(did_targets) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":       "Missing DID parameter in input",
+				"description": "Nil target",
+			})
+			return
+		}
+
+		records, err := dbClient.GetBatchDID(did_targets)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":       "Cannot find the corresponding DID on DB",
+				"Description": err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"count": len(records),
+			"data":  records,
 		})
 	})
 

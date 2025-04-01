@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -55,6 +56,52 @@ func (p *PostgresDB) GetDID(did string) (*DIDRecord, error) {
 	var record DIDRecord
 	err := row.Scan(&record.DID, &record.Document, &record.Hash, &record.Owner, &record.CreatedAt)
 	return &record, err
+}
+
+func (p *PostgresDB) GetBatchDID(dids []string) ([]DIDRecord, error) {
+	var records []DIDRecord
+	placeholders := make([]string, len(dids))
+	args := make([]interface{}, len(dids))
+
+	for i, did := range dids {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = did
+	}
+
+	query := fmt.Sprintf(`
+        SELECT 
+            did, 
+            document, 
+            hash, 
+            owner, 
+            created_at
+        FROM 
+            did_documents 
+        WHERE 
+            did IN (%s)`,
+		strings.Join(placeholders, ", "),
+	)
+	rows, err := p.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var record DIDRecord
+		err = rows.Scan(
+			&record.DID,
+			&record.Document,
+			&record.Hash,
+			&record.Owner,
+			&record.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, record)
+	}
+	return records, nil
 }
 
 func (p *PostgresDB) Close() error {

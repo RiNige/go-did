@@ -1,0 +1,205 @@
+openapi: 3.0.0
+info:
+  title: DID Management API
+  description: 去中心化标识符（DID）管理接口
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: 本地开发环境
+
+paths:
+  /ping:
+    get:
+      summary: 服务健康检查
+      responses:
+        '200':
+          description: 服务正常运行
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "pong"
+
+  /dids:
+    post:
+      summary: 创建新的 DID
+      description: 生成新的 DID 文档并存储到数据库和区块链
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DIDResponse'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      tags:
+        - DID Operations
+
+    get:
+      summary: 批量查询 DID
+      description: 通过 DID 列表批量查询记录
+      parameters:
+        - name: did
+          in: query
+          description: DID 标识符列表
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+              example: "did:ethr:0x123..."
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchDIDResponse'
+        '400':
+          description: 无效请求
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      tags:
+        - DID Operations
+
+  /dids/{did}:
+    get:
+      summary: 查询单个 DID
+      description: 查询指定 DID 的数据库和区块链信息
+      parameters:
+        - name: did
+          in: path
+          required: true
+          description: DID 标识符
+          schema:
+            type: string
+            format: did
+            example: "did:ethr:0x123..."
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DIDDetailResponse'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      tags:
+        - DID Operations
+
+components:
+  schemas:
+    DIDResponse:
+      type: object
+      properties:
+        DID:
+          type: string
+          example: "did:ethr:0x123..."
+        ChainHash:
+          type: string
+          example: "0xabc..."
+        DBHash:
+          type: string
+          example: "a1b2c3..."
+      required: [DID, ChainHash, DBHash]
+
+    DIDDetailResponse:
+      type: object
+      properties:
+        DID:
+          type: string
+          example: "did:ethr:0x123..."
+        Owner:
+          type: string
+          example: "0x456..."
+        Hash on DB:
+          type: string
+          example: "a1b2c3..."
+        Hash on Blockchain:
+          type: string
+          example: "d4e5f6..."
+        Created At:
+          type: string
+          format: date-time
+          example: "2024-03-20T10:00:00Z"
+      required: [DID, Owner]
+
+    BatchDIDResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 2
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DIDRecord'
+
+    DIDRecord:
+      type: object
+      properties:
+        DID:
+          type: string
+          example: "did:ethr:0x123..."
+        Document:
+          type: string
+          example: "{...}"
+        Hash:
+          type: string
+          example: "a1b2c3..."
+        Owner:
+          type: string
+          example: "0x456..."
+        CreatedAt:
+          type: string
+          format: date-time
+          example: "2024-03-20T10:00:00Z"
+      required: [DID]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Database operation failed"
+        details:
+          type: string
+          example: "Connection timeout"
+        description:
+          type: string
+          example: "Failed to connect to PostgreSQL"
+      required: [error]
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+tags:
+  - name: DID Operations
+    description: 与 DID 相关的核心操作
+  - name: System
+    description: 系统级接口
