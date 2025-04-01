@@ -38,3 +38,14 @@ type VerificationResponse struct {
 	ChainNetwork string `json:"chain_network"`
 	LastVerified string `json:"last_verified"`
 }
+
+// Proposed Response for DID Enquiry
+type DIDResponse struct {
+	DID          string       `json:"did"`
+	Document     *DIDDocument `json:"document"`
+	Hash         string       `json:"hash"`
+	Owner        string       `json:"owner"`
+	CreatedAt    string       `json:"created_at"`
+	StoreOnChain bool         `json:"storeonchain"`
+	ChainTXHash  string       `json:"chain_tx_hash,omitempty"`
+}

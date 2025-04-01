@@ -17,7 +17,7 @@ import (
 
 // Some global parameters
 const (
-	systemAccount = "27607949c7345cf1142c809afded87af7c63cc78c15061112373c8dc69952ce7"
+	systemAccount = "5a2701eb7e039fe0077aa3281a00a2e1f869303e94617eb2085ae0c82575288d"
 )
 
 var (
@@ -34,7 +34,7 @@ func main() {
 	defer dbClient.Close()
 
 	// Initiate local Etherum connection
-	ethClient := did.NewClient("8545")
+	ethClient := did.NewClient("7545")
 	defer ethClient.Close()
 
 	// Deploy smart contract to local blockchain
@@ -105,5 +105,35 @@ func main() {
 			"DBHash":    hashHex,
 		})
 	})
+
+	r.GET("/dids/:did", func(c *gin.Context) {
+		did_target := c.Param("did")
+
+		// Find DID Document within PG
+		record, err := dbClient.GetDID(did_target)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":       "Cannot find the corresponding DID on DB",
+				"Description": err.Error()})
+			return
+		}
+
+		// Find DID Document within Blockchain
+		resp_did, err := did.GetHashFromChain(did_target, ethClient, contractClient)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":       "Cannot find the corresponding DID on Blockchain",
+				"Description": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"DID":                record.DID,
+			"Owner":              record.Owner,
+			"Hash on DB":         record.Hash,
+			"Hash on Blockchain": resp_did,
+			"Created At":         record.CreatedAt,
+		})
+	})
+
 	r.Run(":8080")
 }

@@ -1,12 +1,16 @@
 package db
 
-import "database/sql"
+import (
+	"database/sql"
+	"time"
+)
 
 type DIDRecord struct {
-	DID      string
-	Document string
-	Hash     string
-	Owner    string
+	DID       string
+	Document  string
+	Hash      string
+	Owner     string
+	CreatedAt time.Time
 }
 
 type PostgresDB struct {

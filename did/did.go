@@ -153,3 +153,12 @@ func StoreHashOnChain(did string, hash string, owner string, eth *ethclient.Clie
 
 	return tx.Hash().Hex(), nil
 }
+
+func GetHashFromChain(did string, eth *ethclient.Client, contract *contracts.Contracts) (string, error) {
+	hash, err := contract.GetHash(nil, did)
+	if err != nil {
+		return "", fmt.Errorf("failed to enquiry DID on Blockchain: %v", err)
+	}
+
+	return hash, nil
+}

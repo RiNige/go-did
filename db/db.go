@@ -51,9 +51,9 @@ func (p *PostgresDB) SaveDID(record DIDRecord) error {
 }
 
 func (p *PostgresDB) GetDID(did string) (*DIDRecord, error) {
-	row := p.db.QueryRow("SELECT did, document, hash, owner FROM did_documents WHERE did = $1", did)
+	row := p.db.QueryRow("SELECT did, document, hash, owner, created_at FROM did_documents WHERE did = $1", did)
 	var record DIDRecord
-	err := row.Scan(&record.DID, &record.Document, &record.Hash, &record.Owner)
+	err := row.Scan(&record.DID, &record.Document, &record.Hash, &record.Owner, &record.CreatedAt)
 	return &record, err
 }
 
