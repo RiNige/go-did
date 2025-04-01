@@ -5,7 +5,9 @@ info:
   version: 1.0.0
 servers:
   - url: http://localhost:8080
-    description: 本地开发环境
+    description: 本地环境
+  - url: ec2-54-226-103-67.compute-1.amazonaws.com:8080
+    description: AWS环境
 
 paths:
   /ping:
