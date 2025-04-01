@@ -16,6 +16,10 @@ import (
 )
 
 // Some global parameters
+const (
+	systemAccount = "27607949c7345cf1142c809afded87af7c63cc78c15061112373c8dc69952ce7"
+)
+
 var (
 	dbClient       *sql.DB
 	ethClient      *ethclient.Client
@@ -30,11 +34,11 @@ func main() {
 	defer dbClient.Close()
 
 	// Initiate local Etherum connection
-	ethClient := did.NewClient("7545")
+	ethClient := did.NewClient("8545")
 	defer ethClient.Close()
 
 	// Deploy smart contract to local blockchain
-	contractAddress := did.DeployContract(ethClient, "27607949c7345cf1142c809afded87af7c63cc78c15061112373c8dc69952ce7")
+	contractAddress := did.DeployContract(ethClient, systemAccount)
 	contractClient, err := contracts.NewContracts(contractAddress, ethClient)
 	if err != nil {
 		log.Fatalf("Failed to create the smart contract instance:%v", err)
@@ -42,6 +46,13 @@ func main() {
 
 	// Initiate Gin Server
 	r := gin.Default()
+
+	r.GET("/ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "pong",
+		})
+	})
+
 	r.POST("/dids", func(c *gin.Context) {
 
 		// Generate DID
@@ -79,8 +90,7 @@ func main() {
 		}
 
 		// Store the DID Document Hash onto Blockchain
-		tx, err := did.StoreHashOnChain(resp.DID, hashHex, resp.PrivateKey, ethClient, contractClient)
-
+		tx, err := did.StoreHashOnChain(resp.DID, hashHex, systemAccount, ethClient, contractClient)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":       "Failed to save DID Document to Blockchain",

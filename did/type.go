@@ -28,3 +28,13 @@ type DIDCreationResponse struct {
 	StoreOnChain bool         `json:"storeonchain"`
 	Document     *DIDDocument `json:"document"`
 }
+
+// Proposed Response for DID Verification
+type VerificationResponse struct {
+	DID          string `json:"did"`
+	IsValid      bool   `json:"is_valid"`
+	DBHash       string `json:"db_hash"`
+	ChainHash    string `json:"chain_hash"`
+	ChainNetwork string `json:"chain_network"`
+	LastVerified string `json:"last_verified"`
+}
