@@ -84,8 +84,8 @@ paths:
 
   /dids/{did}:
     get:
-      summary: 查询单个 DID
-      description: 查询指定 DID 的数据库和区块链信息
+      summary: 查询单个DID并校验是否与链上的Hash一致
+      description: 查询指定DID的数据库和区块链信息
       parameters:
         - name: did
           in: path
